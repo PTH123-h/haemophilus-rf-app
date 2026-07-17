@@ -261,11 +261,17 @@ def main():
             st.progress(min(max(probability, 0.0), 1.0))
             if threshold_reached:
                 st.error(
-                    "Classification: Above the prespecified nonsusceptibility cutoff."
+                    f"High predicted risk: The predicted probability is "
+                    f"{probability:.1%}, at or above the {decision_threshold:.0%} "
+                    "cutoff. The isolate may be resistant or intermediate to "
+                    "amoxicillin/clavulanate."
                 )
             else:
                 st.success(
-                    "Classification: Below the prespecified nonsusceptibility cutoff."
+                    f"Lower predicted risk: The predicted probability is "
+                    f"{probability:.1%}, below the {decision_threshold:.0%} cutoff. "
+                    "The isolate is less likely to be resistant or intermediate to "
+                    "amoxicillin/clavulanate."
                 )
             st.caption(
                 "The 0.69 cutoff was selected from the training data by maximizing "
