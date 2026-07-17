@@ -12,14 +12,24 @@ MODEL_PATH = APP_DIR / "rf_model.json"
 
 FEATURES = ["NEU", "MONO", "BASO", "Cl", "CK_MB", "ALP", "GLB", "ChE"]
 FEATURE_LABELS = {
-    "NEU": "NEU - 中性粒细胞绝对计数",
-    "MONO": "MONO - 单核细胞绝对计数",
-    "BASO": "BASO - 嗜碱性粒细胞绝对计数",
-    "Cl": "Cl - 氯离子",
-    "CK_MB": "CK-MB - 肌酸激酶同工酶",
-    "ALP": "ALP - 碱性磷酸酶",
-    "GLB": "GLB - 球蛋白",
-    "ChE": "ChE - 胆碱酯酶",
+    "NEU": "NEU",
+    "MONO": "MONO",
+    "BASO": "BASO",
+    "Cl": "Cl",
+    "CK_MB": "CK-MB",
+    "ALP": "ALP",
+    "GLB": "GLB",
+    "ChE": "ChE",
+}
+FEATURE_DESCRIPTIONS = {
+    "NEU": "中性粒细胞绝对计数",
+    "MONO": "单核细胞绝对计数",
+    "BASO": "嗜碱性粒细胞绝对计数",
+    "Cl": "氯离子",
+    "CK_MB": "肌酸激酶同工酶",
+    "ALP": "碱性磷酸酶",
+    "GLB": "球蛋白",
+    "ChE": "胆碱酯酶",
 }
 FEATURE_UNITS = {
     "NEU": "10^9/L",
@@ -116,12 +126,12 @@ def predict_probability(model, values):
 
 def number_input(feature, default, step, value_format):
     return st.number_input(
-        FEATURE_LABELS[feature],
+        f"{FEATURE_LABELS[feature]} ({FEATURE_UNITS[feature]})",
         min_value=0.0,
         value=float(default),
         step=step,
         format=value_format,
-        help=f"单位：{FEATURE_UNITS[feature]}",
+        help=f"{FEATURE_DESCRIPTIONS[feature]}；单位：{FEATURE_UNITS[feature]}",
         key=f"input_{feature}",
     )
 
@@ -131,7 +141,7 @@ def main():
         page_title="流感嗜血杆菌耐药风险计算器",
         page_icon="H",
         layout="centered",
-        initial_sidebar_state="expanded",
+        initial_sidebar_state="collapsed",
     )
 
     st.markdown(
@@ -139,8 +149,8 @@ def main():
         <style>
         .block-container {
             max-width: 980px;
-            padding-top: 2rem;
-            padding-bottom: 2.5rem;
+            padding-top: 1rem;
+            padding-bottom: 1.5rem;
         }
         h1, h2, h3, p, label, button {
             letter-spacing: 0 !important;
@@ -155,20 +165,36 @@ def main():
         [data-testid="stMetricValue"] {
             font-size: 1.65rem;
         }
+        [data-testid="stForm"] {
+            padding: 0.7rem 0.9rem 0.65rem;
+        }
+        [data-testid="stForm"] [data-testid="stVerticalBlock"] {
+            gap: 0.35rem;
+        }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
+            gap: 0.75rem;
+        }
+        [data-testid="stForm"] [data-testid="stNumberInput"] label p {
+            font-size: 0.82rem;
+            line-height: 1.1;
+        }
         [data-testid="stFormSubmitButton"] button {
-            min-height: 2.8rem;
+            min-height: 2.35rem;
+            height: 2.35rem;
             border-radius: 6px;
             font-weight: 650;
         }
-        [data-testid="stNumberInput"] input {
-            min-height: 2.55rem;
+        [data-testid="stForm"] [data-testid="stNumberInput"] input,
+        [data-testid="stForm"] [data-testid="stNumberInput"] button {
+            min-height: 2.05rem;
+            height: 2.05rem;
         }
         [data-testid="stVerticalBlockBorderWrapper"] {
             border-radius: 6px;
         }
         @media (max-width: 640px) {
             .block-container {
-                padding-top: 1.25rem;
+                padding-top: 0.75rem;
                 padding-left: 1rem;
                 padding-right: 1rem;
             }
@@ -189,14 +215,6 @@ def main():
     except Exception as exc:
         st.error(f"模型加载失败：{exc}")
         st.stop()
-
-    with st.sidebar:
-        st.subheader("模型信息")
-        st.metric("验证集 AUC", "0.785")
-        st.caption("95% CI：0.727-0.835")
-        st.metric("判定阈值", f"{model['decision_threshold']:.2f}")
-        st.caption("8项实验室指标 · 400棵决策树")
-        st.warning("仅用于科研演示，不能替代药敏试验和临床判断。")
 
     defaults = model["fill_values"]
     with st.form("prediction_form"):
@@ -227,7 +245,7 @@ def main():
             "GLB": glb,
             "ChE": che,
         }
-        probability, model_input = predict_probability(model, values)
+        probability, _ = predict_probability(model, values)
         decision_threshold = float(model["decision_threshold"])
         threshold_reached = probability >= decision_threshold
 
@@ -242,13 +260,6 @@ def main():
             else:
                 st.success("模型判定：未达到阿莫西林/克拉维酸不敏感阈值。")
             st.caption("该概率是模型输出，不等同于微生物药敏试验结果。")
-
-        with st.expander("查看本次模型输入"):
-            display_values = {
-                f"{feature} ({FEATURE_UNITS[feature]})": value
-                for feature, value in model_input.items()
-            }
-            st.json(display_values)
 
     st.divider()
     st.caption(
