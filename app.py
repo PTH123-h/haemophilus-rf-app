@@ -22,14 +22,14 @@ FEATURE_LABELS = {
     "ChE": "ChE",
 }
 FEATURE_DESCRIPTIONS = {
-    "NEU": "中性粒细胞绝对计数",
-    "MONO": "单核细胞绝对计数",
-    "BASO": "嗜碱性粒细胞绝对计数",
-    "Cl": "氯离子",
-    "CK_MB": "肌酸激酶同工酶",
-    "ALP": "碱性磷酸酶",
-    "GLB": "球蛋白",
-    "ChE": "胆碱酯酶",
+    "NEU": "Absolute neutrophil count",
+    "MONO": "Absolute monocyte count",
+    "BASO": "Absolute basophil count",
+    "Cl": "Serum chloride",
+    "CK_MB": "Creatine kinase-MB",
+    "ALP": "Alkaline phosphatase",
+    "GLB": "Globulin",
+    "ChE": "Cholinesterase",
 }
 FEATURE_UNITS = {
     "NEU": "10^9/L",
@@ -45,7 +45,7 @@ FEATURE_UNITS = {
 
 def load_model_file(path):
     if not path.exists():
-        raise FileNotFoundError("未找到 rf_model.json。")
+        raise FileNotFoundError("rf_model.json was not found.")
     with path.open("r", encoding="utf-8") as model_file:
         model = json.load(model_file)
     required = {
@@ -59,11 +59,11 @@ def load_model_file(path):
     }
     missing = required.difference(model)
     if missing:
-        raise ValueError(f"模型文件缺少字段：{', '.join(sorted(missing))}")
+        raise ValueError(f"Missing model fields: {', '.join(sorted(missing))}")
     if model["feature_names"] != FEATURES:
-        raise ValueError("模型变量顺序与网页变量不一致。")
+        raise ValueError("The model feature order does not match the application.")
     if len(model["trees"]) != model["n_estimators"]:
-        raise ValueError("随机森林树数量与模型元数据不一致。")
+        raise ValueError("The number of trees does not match the model metadata.")
     return model
 
 
@@ -131,14 +131,14 @@ def number_input(feature, default, step, value_format):
         value=float(default),
         step=step,
         format=value_format,
-        help=f"{FEATURE_DESCRIPTIONS[feature]}；单位：{FEATURE_UNITS[feature]}",
+        help=f"{FEATURE_DESCRIPTIONS[feature]}; unit: {FEATURE_UNITS[feature]}",
         key=f"input_{feature}",
     )
 
 
 def main():
     st.set_page_config(
-        page_title="流感嗜血杆菌耐药风险计算器",
+        page_title="H. influenzae Resistance Risk Calculator",
         page_icon="H",
         layout="centered",
         initial_sidebar_state="collapsed",
@@ -151,12 +151,14 @@ def main():
             max-width: 980px;
             padding-top: 1rem;
             padding-bottom: 1.5rem;
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
         }
         h1, h2, h3, p, label, button {
             letter-spacing: 0 !important;
         }
         h1 {
-            font-size: 2rem !important;
+            font-size: 1.75rem !important;
             line-height: 1.25 !important;
         }
         h2, h3 {
@@ -207,18 +209,20 @@ def main():
         unsafe_allow_html=True,
     )
 
-    st.title("流感嗜血杆菌耐药风险计算器")
-    st.caption("随机森林模型 | 结局：阿莫西林/克拉维酸不敏感")
+    st.title("Haemophilus influenzae Antimicrobial Resistance Risk Calculator")
+    st.caption(
+        "Random forest model | Endpoint: amoxicillin/clavulanate nonsusceptibility"
+    )
 
     try:
         model = load_model()
     except Exception as exc:
-        st.error(f"模型加载失败：{exc}")
+        st.error(f"Model loading failed: {exc}")
         st.stop()
 
     defaults = model["fill_values"]
     with st.form("prediction_form"):
-        st.subheader("实验室指标")
+        st.subheader("Laboratory Parameters")
         left, right = st.columns(2)
         with left:
             neu = number_input("NEU", defaults["NEU"], 0.10, "%.2f")
@@ -231,7 +235,7 @@ def main():
             glb = number_input("GLB", defaults["GLB"], 0.10, "%.1f")
             che = number_input("ChE", defaults["ChE"], 10.0, "%.1f")
         submitted = st.form_submit_button(
-            "计算风险", type="primary", use_container_width=True
+            "Calculate Risk", type="primary", use_container_width=True
         )
 
     if submitted:
@@ -250,20 +254,30 @@ def main():
         threshold_reached = probability >= decision_threshold
 
         with st.container(border=True):
-            st.subheader("模型结果")
+            st.subheader("Model Output")
             result_col, threshold_col = st.columns(2)
-            result_col.metric("预测不敏感概率", f"{probability:.1%}")
-            threshold_col.metric("固定判定阈值", f"{decision_threshold:.0%}")
+            result_col.metric("Predicted Nonsusceptibility", f"{probability:.1%}")
+            threshold_col.metric("Youden Cutoff", f"{decision_threshold:.0%}")
             st.progress(min(max(probability, 0.0), 1.0))
             if threshold_reached:
-                st.error("模型判定：达到阿莫西林/克拉维酸不敏感阈值。")
+                st.error(
+                    "Classification: Above the prespecified nonsusceptibility cutoff."
+                )
             else:
-                st.success("模型判定：未达到阿莫西林/克拉维酸不敏感阈值。")
-            st.caption("该概率是模型输出，不等同于微生物药敏试验结果。")
+                st.success(
+                    "Classification: Below the prespecified nonsusceptibility cutoff."
+                )
+            st.caption(
+                "The 0.69 cutoff was selected from the training data by maximizing "
+                "Youden's J. The predicted probability does not replace standardized "
+                "antimicrobial susceptibility testing."
+            )
 
     st.divider()
     st.caption(
-        "本工具用于科研演示。任何抗菌药物选择均应结合标准药敏试验、患者情况及临床判断。"
+        "For research demonstration only. Antimicrobial selection should integrate "
+        "standardized susceptibility testing, patient characteristics, and clinical "
+        "judgment."
     )
 
 
